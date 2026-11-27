@@ -4,7 +4,7 @@ import { resourceFromAttributes } from "@opentelemetry/resources";
 import { LoggerProvider, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
 
 const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
-const host = process.env.NEXT_PUBLIC_POSTHOG_HOST;
+const host = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? "https://eu.i.posthog.com";
 
 const loggerProvider =
   token && host
@@ -33,12 +33,8 @@ export function register() {
 
   if (!logger) {
     if (process.env.NODE_ENV !== "production") {
-      const missingVariable = token
-        ? "NEXT_PUBLIC_POSTHOG_HOST"
-        : "NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN";
-
       console.warn(
-        `${missingVariable} variable required by PostHog is missing or un-configured, this causes events to be silently missed. This error stops appearing once ${missingVariable} is configured`,
+        "NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN is not set: PostHog server logs are disabled.",
       );
     }
     return;

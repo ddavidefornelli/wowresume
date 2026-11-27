@@ -13,8 +13,11 @@
     "@opentelemetry/exporter-logs-otlp-http": "^0.301.2",
     "@opentelemetry/resources": "^3.1.1",
     "@opentelemetry/sdk-logs": "^3.1.1",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.119.2",
     "next": "16.4.6",
     "posthog-js": "^1.455.4",
+    "posthog-node": "^6.2.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
