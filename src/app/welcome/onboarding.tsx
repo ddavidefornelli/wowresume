@@ -10,7 +10,6 @@ import {
   BLOCKERS, COMPANIES, COMP_MAX, COMP_STEP, EMPTY_ANSWERS, EXPERIENCE, GOALS, ROLES, SITUATIONS,
   STACK, STAGES, TIME, VISA, WORK_MODES, buildPlan, type Answers, type Option,
 } from "@/lib/onboarding";
-import { saveOnboarding } from "./actions";
 
 const SCREENS = [
   "intro", "name", "goal", "situation", "experience", "role", "stack", "fact_seconds",
@@ -52,7 +51,8 @@ function store(s: Stored | null) {
 
 /** Rendered on the client only (see client.tsx), so it can read localStorage while initializing. */
 export function Onboarding() {
-  // Resume where they left off. Coming back from sign-in (?saved=1) lands on "save" and saves below.
+  // Resume where they left off. Coming back from sign-in (?saved=1) lands on "save" and finishes below.
+  // Answers and the resume only ever live in this browser's localStorage, never on our servers.
   const [init] = useState(() => {
     const saved = load();
     const returning = new URLSearchParams(window.location.search).get("saved") === "1";
@@ -67,7 +67,6 @@ export function Onboarding() {
   });
   const [screen, setScreen] = useState<Screen>(init.screen);
   const [a, setA] = useState<Answers>(init.answers);
-  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has("saved")) {
@@ -78,8 +77,7 @@ export function Onboarding() {
   }, []);
 
   useEffect(() => {
-    if (screen === "saved") store(null);
-    else if (screen !== "intro") store({ answers: a, screen });
+    if (screen !== "intro") store({ answers: a, screen });
   }, [a, screen]);
 
   const set = <K extends keyof Answers>(k: K, v: Answers[K]) => setA((p) => ({ ...p, [k]: v }));
@@ -104,31 +102,24 @@ export function Onboarding() {
     setScreen(SCREENS[Math.max(0, i - 1)] === "building" ? "github" : SCREENS[Math.max(0, i - 1)]);
   };
 
+  /** Finishes onboarding once they're signed in. Nothing is uploaded: the plan stays in this browser. */
   async function persist(answers: Answers) {
-    const res = await saveOnboarding(answers);
-    setSaveError(null);
-    if (res.ok) {
-      posthog.capture("onboarding_saved", {
-        goal: answers.goal,
-        experience: answers.experience,
-        role: answers.role,
-        stage: answers.stage,
-        blocker: answers.blocker,
-        has_resume: Boolean(answers.resumeText),
-      });
-      setScreen("saved");
-      return true;
+    const { data } = await createClient().auth.getClaims();
+    if (!data?.claims?.sub) {
+      setScreen("save");
+      return false;
     }
-    if (res.reason === "error") setSaveError("We couldn't save your plan. Please try again.");
-    setScreen("save");
-    return false;
+    posthog.capture("onboarding_saved", { has_resume: Boolean(answers.resumeText) });
+    setScreen("saved");
+    return true;
   }
 
   const qIndex = QUESTIONS.indexOf(screen);
   const showBack = !["intro", "building", "plan", "saved"].includes(screen);
 
   return (
-    <div className="flex min-h-svh flex-col bg-[#0a0a0a] text-[#ededed]">
+    // ph-no-capture: PostHog autocapture and session replay skip this flow, so answers never reach analytics.
+    <div className="ph-no-capture flex min-h-svh flex-col bg-[#0a0a0a] text-[#ededed]">
       <header className="sticky top-0 z-10 flex h-14 items-center gap-4 bg-[#0a0a0a]/90 px-4 backdrop-blur sm:px-6">
         <div className="flex w-8 justify-start">
           {showBack && (
@@ -166,7 +157,7 @@ export function Onboarding() {
 
       <main className="flex flex-1 justify-center px-4 pb-16 sm:px-6">
         <div key={screen} className="animate-step-in my-auto w-full max-w-xl py-10">
-          <Step screen={screen} a={a} set={set} next={next} go={go} persist={persist} saveError={saveError} />
+          <Step screen={screen} a={a} set={set} next={next} go={go} persist={persist} />
         </div>
       </main>
     </div>
@@ -180,10 +171,9 @@ type StepProps = {
   next: () => void;
   go: (s: Screen) => void;
   persist: (a: Answers) => Promise<boolean>;
-  saveError: string | null;
 };
 
-function Step({ screen, a, set, next, go, persist, saveError }: StepProps) {
+function Step({ screen, a, set, next, go, persist }: StepProps) {
   const name = a.firstName.trim();
   const you = (s: string) => (name ? `${name}, ${s}` : s.charAt(0).toUpperCase() + s.slice(1));
   const choose = (k: "goal" | "situation" | "experience" | "role" | "visa" | "stage" | "blocker" | "time") =>
@@ -467,7 +457,7 @@ function Step({ screen, a, set, next, go, persist, saveError }: StepProps) {
             <Primary
               onClick={async () => {
                 posthog.capture("onboarding_plan_cta");
-                // Already signed in? Save straight away. Otherwise ask them to sign in.
+                // Already signed in? Finish straight away. Otherwise ask them to sign in.
                 if (!(await persist(a))) go("save");
               }}
             >
@@ -478,7 +468,7 @@ function Step({ screen, a, set, next, go, persist, saveError }: StepProps) {
       );
 
     case "save":
-      return <SaveStep a={a} error={saveError} />;
+      return <SaveStep a={a} />;
 
     case "saved":
       return (
@@ -644,7 +634,7 @@ function PlanView({ a, saved, children }: { a: Answers; saved?: boolean; childre
   const marks = ["Today", "Apply", "Interview", "Offer"];
   return (
     <>
-      <Eyebrow>{saved ? "Plan saved" : "Your path"}</Eyebrow>
+      <Eyebrow>{saved ? "Plan saved on this device" : "Your path"}</Eyebrow>
       {saved && (
         <Title>You&apos;re in{a.firstName.trim() ? `, ${a.firstName.trim()}` : ""}.</Title>
       )}
@@ -711,7 +701,7 @@ function PlanView({ a, saved, children }: { a: Answers; saved?: boolean; childre
   );
 }
 
-function SaveStep({ a, error }: { a: Answers; error: string | null }) {
+function SaveStep({ a }: { a: Answers }) {
   const plan = useMemo(() => buildPlan(a), [a]);
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "google" | "sending" | "sent">("idle");
@@ -754,7 +744,10 @@ function SaveStep({ a, error }: { a: Answers; error: string | null }) {
     <>
       <Eyebrow>Almost there</Eyebrow>
       <Title>Save your plan.</Title>
-      <Sub>Create your free account to keep your plan and pick up right where you left off.</Sub>
+      <Sub>
+        Create your free account to pick up right where you left off. Your answers and your resume stay
+        on this device. We only keep your email.
+      </Sub>
 
       <div className="mt-7 rounded-2xl border border-[#1f1f1f] bg-[#0f0f0f] p-5">
         <div className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#666]">Your path</div>
@@ -825,8 +818,13 @@ function SaveStep({ a, error }: { a: Answers; error: string | null }) {
         </>
       )}
 
-      {(authError || error) && <p className="mt-4 text-sm text-[#f87171]">{authError || error}</p>}
-      <p className="mt-6 text-xs text-[#555]">We never share your data with employers.</p>
+      {authError && <p className="mt-4 text-sm text-[#f87171]">{authError}</p>}
+      <p className="mt-6 text-xs text-[#555]">
+        We never store your answers or your resume, and never share your data.{" "}
+        <Link href="/privacy" className="underline underline-offset-4 hover:text-[#a3a3a3]">
+          Privacy policy
+        </Link>
+      </p>
     </>
   );
 }

@@ -290,7 +290,7 @@ export function ResumeChecker() {
                       <div className="mt-2 text-sm text-[#a3a3a3]">
                         {c.fix}
                         {c.examples && c.examples.length > 0 && (
-                          <ul className="mt-2 space-y-1">
+                          <ul className="ph-no-capture mt-2 space-y-1">
                             {c.examples.map((e) => (
                               <li
                                 key={e}
@@ -346,7 +346,10 @@ export function ResumeChecker() {
               </div>
               {lead.error && <p className="mt-2 text-sm text-[#f87171]">{lead.error}</p>}
               <p className="mt-3 text-xs text-[#666]">
-                We&apos;ll also tell you when wowresume can rewrite it for you. Unsubscribe anytime.
+                We&apos;ll also tell you when wowresume can rewrite it for you. Unsubscribe anytime.{" "}
+                <a href="/privacy" className="underline underline-offset-4 hover:text-[#a3a3a3]">
+                  Privacy policy
+                </a>
               </p>
             </form>
           )}

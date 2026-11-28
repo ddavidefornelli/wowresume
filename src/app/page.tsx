@@ -40,6 +40,13 @@ export default function Home() {
         </div>
 
         <ResumeChecker />
+
+        <footer className="mt-20 flex w-full max-w-3xl items-center justify-between border-t border-[#1a1a1a] pt-6 text-sm text-[#666]">
+          <span>© wowresume</span>
+          <Link href="/privacy" className="hover:text-[#ededed]">
+            Privacy
+          </Link>
+        </footer>
       </div>
     </div>
   );
