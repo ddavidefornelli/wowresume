@@ -7,6 +7,14 @@ export default function Home() {
     <div className="relative flex flex-1 flex-col items-center overflow-hidden bg-[#0a0a0a] px-4 pb-20 text-[#ededed]">
       <PixelBackground />
       <div className="relative flex w-full flex-col items-center">
+        <header className="absolute inset-x-0 top-0 mx-auto flex h-16 w-full max-w-5xl items-center">
+          <Link href="/" className="flex items-center gap-2.5 text-lg font-bold tracking-[-0.05em]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.svg" alt="" width={28} height={28} />
+            wowresume
+          </Link>
+        </header>
+
         {/* hero fills 95% of the screen so the next section peeks in below */}
         <div className="flex min-h-[95svh] w-full flex-col items-center justify-center py-12">
           <h1 className="max-w-5xl text-center text-[44px] font-bold leading-[0.95] tracking-[-0.065em] sm:text-7xl lg:text-[104px]">
